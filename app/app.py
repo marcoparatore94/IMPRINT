@@ -29,9 +29,8 @@ MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data
 with st.expander("Information and cut-offs"):
     st.markdown(get_info_html(), unsafe_allow_html=True)
 
-# --- Form (split into rows: clinical, ultrasound; lab separated) ---
+# --- Form (rows: clinical, ultrasound; lab separated) ---
 with st.form("risk_form"):
-
     # Row 1: Clinical data
     st.subheader("Clinical data")
     c1, c2 = st.columns(2)
@@ -70,13 +69,14 @@ def classify_risk(p: float) -> str:
         return "Low"
     elif p < 0.023:
         return "Intermediate"
+        # 0.4% and 2.3% thresholds aligned with prior app logic
     else:
         return "High"
 
 def risk_color(cls: str) -> str:
     return "green" if cls == "Low" else ("orange" if cls == "Intermediate" else "red")
 
-# Report cut-offs (Youden) for visualization
+# Youden cut-offs for visualization (from latest analysis)
 CUTOFFS = {
     "NLR": 2.39,
     "SII": 655.08,
@@ -95,13 +95,13 @@ if submitted:
     else:
         NLR = SII = SIRI = PIV = 0.0
 
-    # Ultrasound and diameter encoding (aligned with previous training)
+    # Ultrasound and diameter encoding (aligned with current deployed model)
     diameter_gt8 = 1 if diameter > 80 else 0
     margins_irregular = 1 if margins == "Irregular" else 0
     color4 = 1 if color_doppler == "4" else 0
     shadows_absent = 1 if acoustic_shadows == "Absent" else 0
 
-    # Input vector (keep order consistent with the current deployed model)
+    # Input vector (keep order consistent with the current model)
     # ["NLR","SII","SIRI","PIV","Age","diameter_gt8","Margini_irregolari","Color4","Ombre_assenti"]
     x = np.array([[NLR, SII, SIRI, PIV,
                    age, diameter_gt8,
@@ -135,37 +135,33 @@ if submitted:
 
     # --- Numeric summary of markers vs cut-offs ---
     st.subheader("Markers vs cut-offs")
-    s1, s2 = st.columns(2)
-    with s1:
-        st.write(f"• NLR: {NLR:.2f} (cut-off {CUTOFFS['NLR']})")
-        st.write(f"• SIRI: {SIRI:.2f} (cut-off {CUTOFFS['SIRI']})")
-    with s2:
-        st.write(f"• SII: {SII:.2f} (cut-off {CUTOFFS['SII']})")
-        st.write(f"• PIV: {PIV:.2f} (cut-off {CUTOFFS['PIV']})")
+    st.write("Each marker is shown separately with its Youden cut-off.")
 
-    # --- Visualization: bars with cut-off lines (always shown) ---
     import matplotlib.pyplot as plt
 
-    labels = ["NLR", "SII", "SIRI", "PIV"]
-    values = [NLR, SII, SIRI, PIV]
-    cutoffs = [CUTOFFS[l] for l in labels]
+    markers = {
+        "NLR": (NLR, CUTOFFS["NLR"]),
+        "SII": (SII, CUTOFFS["SII"]),
+        "SIRI": (SIRI, CUTOFFS["SIRI"]),
+        "PIV": (PIV, CUTOFFS["PIV"]),
+    }
 
-    fig, ax = plt.subplots(figsize=(7, 4))
-    bars = ax.bar(labels, values, color=["#4C78A8", "#F58518", "#54A24B", "#E45756"], alpha=0.8)
+    # Separate boxes: one chart per marker
+    for name, (val, cutoff) in markers.items():
+        with st.container():
+            st.markdown(f"**{name}**: {val:.2f} (cut-off {cutoff:.2f})")
 
-    # Horizontal cut-off lines for each marker
-    for i, (label, cutoff) in enumerate(zip(labels, cutoffs)):
-        ax.hlines(y=cutoff, xmin=i - 0.4, xmax=i + 0.4, colors="black", linestyles="--", linewidth=1.5)
-        ax.text(i, cutoff, f"Cut-off {cutoff:.2f}", va="bottom", ha="center", fontsize=9)
+            fig, ax = plt.subplots(figsize=(5, 3))
+            ax.bar([name], [val], color="#4C78A8", alpha=0.85)
+            ax.hlines(y=cutoff, xmin=-0.5, xmax=0.5, colors="red", linestyles="--", linewidth=1.5)
+            ax.text(0, cutoff, f"Cut-off {cutoff:.2f}", va="bottom", ha="center", fontsize=9)
 
-    # Annotate bars with values and above/below status
-    for i, (val, cutoff) in enumerate(zip(values, cutoffs)):
-        status = "↑ above" if val >= cutoff else "↓ below"
-        ax.text(i, val, f"{val:.2f}\n({status})", ha="center", va="bottom", fontsize=9)
+            status = "↑ above" if val >= cutoff else "↓ below"
+            ax.text(0, val, f"{val:.2f}\n({status})", ha="center", va="bottom", fontsize=9)
 
-    ax.set_ylabel("Value")
-    ax.set_title("Marker values vs Youden cut-offs")
-    ax.set_ylim(bottom=0)  # start at zero
-    st.pyplot(fig)
+            ax.set_ylim(bottom=0)
+            ax.set_ylabel("Value")
+            ax.set_title(f"{name} vs cut-off")
+            st.pyplot(fig)
 
     st.caption("Model trained on center data. Clinical validation ongoing.")

@@ -27,7 +27,7 @@ MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data
 with st.expander("Informazioni e cut-off"):
     st.markdown(get_info_html(), unsafe_allow_html=True)
 
-# --- Form di input ---
+# --- Form di input (solo gli input e il bottone) ---
 with st.form("risk_form"):
     col1, col2 = st.columns(2)
     age = col1.number_input("Età (anni)", min_value=15, max_value=95, value=50)
@@ -46,10 +46,11 @@ with st.form("risk_form"):
     eosinofili = st.number_input("Eosinofili", min_value=0.0, max_value=5.0, value=0.2)
     piastrine = st.number_input("Piastrine", min_value=10.0, max_value=1000.0, value=250.0)
 
-    show_details = st.checkbox("Mostra dettagli indici ematologici")
-    show_radar = st.checkbox("Mostra grafico radar indici ematologici")
-
     submitted = st.form_submit_button("Calcola rischio")
+
+# --- Checkbox fuori dal form (sempre visibili e reattivi) ---
+show_details = st.checkbox("Mostra dettagli indici ematologici")
+show_radar = st.checkbox("Mostra grafico radar indici ematologici")
 
 # --- Funzioni di supporto ---
 def classify_risk(p: float) -> str:
@@ -95,10 +96,8 @@ if submitted:
     cls = classify_risk(p)
     recommendation = suggest_action(cls)
 
-    # Probabilità
+    # Probabilità e barra di rischio
     st.markdown(f"### Probabilità di malignità: {p:.3%}")
-
-    # Barra di rischio (progress bar)
     st.progress(min(int(p * 100), 100))
 
     # Classe di rischio con colore
@@ -111,14 +110,14 @@ if submitted:
     # Raccomandazione clinica
     st.write(recommendation)
 
-    # Dettagli indici ematologici
+    # Dettagli indici ematologici (se attivato)
     if show_details:
         st.write(f"NLR: {NLR:.2f}")
         st.write(f"SII: {SII:.2f}")
         st.write(f"SIRI: {SIRI:.2f}")
         st.write(f"PIV: {PIV:.2f}")
 
-    # Grafico radar dei marker con media coorte reale (se i file Excel sono disponibili)
+    # Grafico radar (se attivato)
     if show_radar:
         import matplotlib.pyplot as plt
         import pandas as pd
@@ -127,6 +126,7 @@ if submitted:
         malignant_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "DB_Imprint_malignant.xlsx"))
 
         try:
+            # Prova a usare i dati reali della coorte se i file sono presenti
             if os.path.exists(benign_path) and os.path.exists(malignant_path):
                 benign = pd.read_excel(benign_path)
                 malignant = pd.read_excel(malignant_path)
@@ -150,8 +150,9 @@ if submitted:
                     float(df["PIV"].mean())
                 ]
             else:
+                # Fallback se i file non sono disponibili (es. su Streamlit Cloud)
                 st.info("Valori medi coorte non disponibili (file Excel non trovati). Uso medie di riferimento generiche.")
-                reference_means = [3.0, 600.0, 1.5, 800.0]  # fallback generico
+                reference_means = [3.0, 600.0, 1.5, 800.0]
 
             # Valori del paziente
             labels = ["NLR", "SII", "SIRI", "PIV"]

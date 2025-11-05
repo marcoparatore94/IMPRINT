@@ -3,6 +3,7 @@ import sys
 import streamlit as st
 import numpy as np
 from joblib import load
+import matplotlib.pyplot as plt
 
 # Fix per importare moduli dalla root del progetto
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -90,8 +91,13 @@ if submitted:
     cls = classify_risk(p)
     recommendation = suggest_action(cls)
 
+    # --- Output testuale ---
     st.markdown(f"### Probabilità di malignità: {p:.3%}")
 
+    # --- Barra di avanzamento ---
+    st.progress(min(int(p*100), 100))
+
+    # --- Classe di rischio colorata ---
     if cls == "Basso":
         color = "green"
     elif cls == "Intermedio":
@@ -105,4 +111,21 @@ if submitted:
     )
 
     st.write(recommendation)
+
+    # --- Grafico a torta (overview dataset) ---
+    st.subheader("Distribuzione casi nel dataset")
+    try:
+        import pandas as pd
+        benign = pd.read_excel(os.path.join(os.path.dirname(__file__), "..", "DB Imprint_benign.xlsx"))
+        malignant = pd.read_excel(os.path.join(os.path.dirname(__file__), "..", "DB_Imprint_malignant.xlsx"))
+        sizes = [len(benign), len(malignant)]
+        labels = ["Benigni", "Maligni"]
+
+        fig, ax = plt.subplots()
+        ax.pie(sizes, labels=labels, autopct='%1.1f%%', colors=["#4CAF50", "#F44336"])
+        ax.axis("equal")
+        st.pyplot(fig)
+    except Exception as e:
+        st.warning("Impossibile mostrare la distribuzione: " + str(e))
+
     st.caption("Modello addestrato sui dati del centro. Validazione clinica in corso.")

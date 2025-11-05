@@ -112,20 +112,5 @@ if submitted:
 
     st.write(recommendation)
 
-    # --- Grafico a torta (overview dataset) ---
-    st.subheader("Distribuzione casi nel dataset")
-    try:
-        import pandas as pd
-        benign = pd.read_excel(os.path.join(os.path.dirname(__file__), "..", "DB Imprint_benign.xlsx"))
-        malignant = pd.read_excel(os.path.join(os.path.dirname(__file__), "..", "DB_Imprint_malignant.xlsx"))
-        sizes = [len(benign), len(malignant)]
-        labels = ["Benigni", "Maligni"]
-
-        fig, ax = plt.subplots()
-        ax.pie(sizes, labels=labels, autopct='%1.1f%%', colors=["#4CAF50", "#F44336"])
-        ax.axis("equal")
-        st.pyplot(fig)
-    except Exception as e:
-        st.warning("Impossibile mostrare la distribuzione: " + str(e))
-
     st.caption("Modello addestrato sui dati del centro. Validazione clinica in corso.")
+

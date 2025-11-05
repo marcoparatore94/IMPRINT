@@ -10,15 +10,19 @@ from utils.info_panel import get_info_html
 
 # --- Configurazione pagina ---
 st.set_page_config(page_title="IMPRINT Risk Calculator", page_icon="🧮", layout="centered")
-st.title("Calcolatore rischio malignità (IMPRINT)")
 
-# --- Login ---
+# --- Login box centrale ---
+st.title("🔒 Accesso IMPRINT")
+
 PASSWORD = "Imprintfpg2025"
-st.sidebar.subheader("🔒 Accesso")
-password = st.sidebar.text_input("Inserisci la password", type="password")
+password = st.text_input("Inserisci la password", type="password")
+
 if password != PASSWORD:
-    st.error("Accesso negato. Inserisci la password corretta.")
+    st.warning("Inserisci la password per accedere all'applicazione.")
     st.stop()
+
+# --- Se la password è corretta, mostra il resto ---
+st.title("Calcolatore rischio malignità (IMPRINT)")
 
 # --- Percorso modello ---
 MODEL_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "imprint_risk_model.joblib"))
@@ -39,7 +43,7 @@ with st.form("risk_form"):
 
     submitted = st.form_submit_button("Calcola rischio")
 
-# --- Checkbox fuori dal form ---
+# --- Checkbox FUORI dal form ---
 show_details = st.checkbox("Mostra dettagli indici ematologici")
 show_radar = st.checkbox("Mostra grafico radar indici ematologici")
 
@@ -72,10 +76,11 @@ if submitted:
     p = float(model.predict_proba(x)[0, 1])
     cls = classify_risk(p)
 
-    # Barra di rischio
+    # Barra di rischio con colore dinamico
+    color = "green" if cls == "Basso" else ("orange" if cls == "Intermedio" else "red")
     st.markdown(f"### Probabilità di malignità: {p:.3%}")
     st.progress(min(int(p * 100), 100))
-    st.write(f"Classe di rischio: **{cls}**")
+    st.markdown(f"### Classe di rischio: <span style='color:{color}'>{cls}</span>", unsafe_allow_html=True)
 
     # Dettagli opzionali
     if show_details:

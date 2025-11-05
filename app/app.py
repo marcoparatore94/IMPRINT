@@ -69,14 +69,13 @@ def classify_risk(p: float) -> str:
         return "Low"
     elif p < 0.023:
         return "Intermediate"
-        # 0.4% and 2.3% thresholds aligned with prior app logic
     else:
         return "High"
 
 def risk_color(cls: str) -> str:
     return "green" if cls == "Low" else ("orange" if cls == "Intermediate" else "red")
 
-# Youden cut-offs for visualization (from latest analysis)
+# Youden cut-offs for visualization
 CUTOFFS = {
     "NLR": 2.39,
     "SII": 655.08,
@@ -133,9 +132,9 @@ if submitted:
         unsafe_allow_html=True
     )
 
-    # --- Numeric summary of markers vs cut-offs ---
+    # --- Compact marker charts side-by-side ---
     st.subheader("Markers vs cut-offs")
-    st.write("Each marker is shown separately with its Youden cut-off.")
+    st.write("Each marker is shown with its Youden cut-off.")
 
     import matplotlib.pyplot as plt
 
@@ -146,22 +145,23 @@ if submitted:
         "PIV": (PIV, CUTOFFS["PIV"]),
     }
 
-    # Separate boxes: one chart per marker
-    for name, (val, cutoff) in markers.items():
-        with st.container():
-            st.markdown(f"**{name}**: {val:.2f} (cut-off {cutoff:.2f})")
+    cols = st.columns(2)  # two charts per row
+    for idx, (name, (val, cutoff)) in enumerate(markers.items()):
+        with cols[idx % 2]:
+            st.markdown(f"**{name}:** {val:.2f} — **Cut-off:** {cutoff:.2f}")
 
-            fig, ax = plt.subplots(figsize=(5, 3))
-            ax.bar([name], [val], color="#4C78A8", alpha=0.85)
-            ax.hlines(y=cutoff, xmin=-0.5, xmax=0.5, colors="red", linestyles="--", linewidth=1.5)
-            ax.text(0, cutoff, f"Cut-off {cutoff:.2f}", va="bottom", ha="center", fontsize=9)
+            fig, ax = plt.subplots(figsize=(3, 2))  # smaller figure
+            ax.bar([name], [val], color="#4C78A8", alpha=0.85, width=0.6)
+            ax.hlines(y=cutoff, xmin=-0.4, xmax=0.4, colors="red", linestyles="--", linewidth=1.2)
+            ax.text(0, cutoff, f"Cut-off {cutoff:.2f}", va="bottom", ha="center", fontsize=8)
 
             status = "↑ above" if val >= cutoff else "↓ below"
-            ax.text(0, val, f"{val:.2f}\n({status})", ha="center", va="bottom", fontsize=9)
+            ax.text(0, val, f"{val:.2f}\n({status})", ha="center", va="bottom", fontsize=8)
 
             ax.set_ylim(bottom=0)
-            ax.set_ylabel("Value")
-            ax.set_title(f"{name} vs cut-off")
+            ax.set_ylabel("Value", fontsize=9)
+            ax.set_title(f"{name} vs cut-off", fontsize=10)
+            ax.tick_params(labelsize=8)
             st.pyplot(fig)
 
     st.caption("Model trained on center data. Clinical validation ongoing.")

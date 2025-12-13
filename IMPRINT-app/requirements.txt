@@ -2,8 +2,8 @@
 numpy==2.3.5
 scipy==1.16.3
 
-# Statsmodels (compatibile con numpy 2.x)
-statsmodels==0.15.0
+# Statsmodels (ultima disponibile e compatibile)
+statsmodels==0.14.6
 
 # Data stack
 pandas==2.3.3

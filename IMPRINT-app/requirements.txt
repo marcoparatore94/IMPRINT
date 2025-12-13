@@ -2,7 +2,7 @@
 numpy==2.3.5
 scipy==1.16.3
 
-# Statsmodels (ultima disponibile e compatibile)
+# Statsmodels (compatibile con numpy 2.x)
 statsmodels==0.14.6
 
 # Data stack
@@ -10,3 +10,6 @@ pandas==2.3.3
 
 # Streamlit app
 streamlit==1.52.1
+
+# Model persistence
+joblib==1.4.2

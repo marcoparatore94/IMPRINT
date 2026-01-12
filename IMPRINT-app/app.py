@@ -85,7 +85,7 @@ COEFF_MYLUNAR = {
     'irregular_margins': 1.790647, 'cs_4': 1.425928, 'shadows': -1.032002
 }
 
-# Cutoffs indicativi per colorazione (solo per visualizzazione)
+# Cutoffs indicativi per colorazione
 SIM_CUTOFFS = {
     "NLR": 3.0,
     "PIV": 400.0,
@@ -109,7 +109,7 @@ def sigmoid(logit):
     return 1 / (1 + math.exp(-logit))
 
 def get_risk_info(prob):
-    """Restituisce colore, classe e raccomandazione."""
+    """Restituisce colore, classe e raccomandazione (ENG)."""
     pct = prob * 100
     if pct < 10:
         return "#28a745", "LOW RISK", "Conservative management / Follow-up", "rgba(40, 167, 69, 0.1)"
@@ -119,33 +119,51 @@ def get_risk_info(prob):
         return "#dc3545", "HIGH RISK", "Planned oncologic surgery", "rgba(220, 53, 69, 0.1)"
 
 def get_sim_style(value, name):
-    """Restituisce colore rosso se sopra cutoff."""
     cutoff = SIM_CUTOFFS.get(name, 9999)
     color = "#dc3545" if value >= cutoff else "#212529"
     return f"color: {color};"
 
-def generate_report_text(lang, inputs, results):
-    """Genera il testo per il copia-incolla."""
-    # Estrai percentuali
-    p_ext = results['prob_ext'] * 100
-    p_core = results['prob_core'] * 100
-    p_mylunar = results['prob_mylunar'] * 100
+def generate_report_text(lang_selection, inputs, results):
+    """Genera il testo per il copia-incolla. Usa .get() per evitare crash."""
     
-    if lang == "🇮🇹 Italiano":
+    # Estrazione sicura valori
+    p_ext = results.get('prob_ext', 0) * 100
+    p_core = results.get('prob_core', 0) * 100
+    p_mylunar = results.get('prob_mylunar', 0) * 100
+    
+    risk_label = results.get('risk_label', 'N/A')
+    
+    # Recupero valori SIMs sicuri
+    v_piv = results.get('piv', 0)
+    v_nlr = results.get('nlr', 0)
+    v_mlr = results.get('mlr', 0)
+
+    # Determina se Italiano (Controlla se la stringa contiene 'Italiano')
+    is_ita = "Italiano" in lang_selection
+    
+    if is_ita:
+        # Traduzione dinamica della raccomandazione
+        if p_ext < 10:
+            rec_ita = "Gestione conservativa / Follow-up ecografico"
+        elif p_ext < 50:
+            rec_ita = "Risonanza Magnetica (RM) / Riferimento a centro esperto"
+        else:
+            rec_ita = "Chirurgia oncologica pianificata presso centro di riferimento"
+
         text = f"""**REFERTO IMPRINT RISK ASSESSMENT**
 ------------------------------------------------
-**Paziente:** {int(inputs['age'])} anni, {inputs['menopause']}
-**Ecografia:** Massa di {inputs['diameter']} mm, CS {inputs['cs']}
-Caratteristiche: Margini {"Irregolari" if inputs['irr'] else "Regolari"}, {"Aree Cistiche" if inputs['cyst'] else "Solida"}, {"Ombre Acustiche" if inputs['shadows'] else "Nessuna Ombra"}.
+**Paziente:** {int(inputs.get('age',0))} anni, {inputs.get('menopause','')}
+**Ecografia:** Massa di {inputs.get('diameter',0)} mm, CS {inputs.get('cs',0)}
+Caratteristiche: Margini {"Irregolari" if inputs.get('irr') else "Regolari"}, {"Aree Cistiche" if inputs.get('cyst') else "Solida"}, {"Ombre Acustiche" if inputs.get('shadows') else "Nessuna Ombra"}.
 
 **Profilo Infiammatorio (Drivers):**
-- PIV: {results['piv']:.0f}
-- NLR: {results['nlr']:.2f}
-- MLR: {results['mlr']:.2f}
+- PIV: {v_piv:.0f}
+- NLR: {v_nlr:.2f}
+- MLR: {v_mlr:.2f}
 
 **RISULTATI MODELLI:**
-1. IMPRINT Extended (Ref): {p_ext:.1f}% - {results['risk_label']}
-   *Guidance: {results['rec']}*
+1. IMPRINT Extended (Ref): {p_ext:.1f}% - {risk_label}
+   *Raccomandazione: {rec_ita}*
 
 2. IMPRINT Core (Morphology only): {p_core:.1f}%
 3. MYLUNAR (External): {p_mylunar:.1f}%
@@ -153,20 +171,21 @@ Caratteristiche: Margini {"Irregolari" if inputs['irr'] else "Regolari"}, {"Aree
 *Calcolato tramite IMPRINT App - Solo a scopo di ricerca.*"""
     
     else: # English
+        rec_eng = results.get('rec', '')
         text = f"""**IMPRINT RISK ASSESSMENT REPORT**
 ------------------------------------------------
-**Patient:** {int(inputs['age'])} y.o., {inputs['menopause']}
-**Ultrasound:** Mass {inputs['diameter']} mm, CS {inputs['cs']}
-Features: {"Irregular" if inputs['irr'] else "Regular"} margins, {"Cystic areas" if inputs['cyst'] else "Solid"}, {"Acoustic Shadows" if inputs['shadows'] else "No Shadows"}.
+**Patient:** {int(inputs.get('age',0))} y.o., {inputs.get('menopause','')}
+**Ultrasound:** Mass {inputs.get('diameter',0)} mm, CS {inputs.get('cs',0)}
+Features: {"Irregular" if inputs.get('irr') else "Regular"} margins, {"Cystic areas" if inputs.get('cyst') else "Solid"}, {"Acoustic Shadows" if inputs.get('shadows') else "No Shadows"}.
 
 **Inflammatory Profile (Drivers):**
-- PIV: {results['piv']:.0f}
-- NLR: {results['nlr']:.2f}
-- MLR: {results['mlr']:.2f}
+- PIV: {v_piv:.0f}
+- NLR: {v_nlr:.2f}
+- MLR: {v_mlr:.2f}
 
 **MODEL RESULTS:**
-1. IMPRINT Extended (Ref): {p_ext:.1f}% - {results['risk_label']}
-   *Guidance: {results['rec']}*
+1. IMPRINT Extended (Ref): {p_ext:.1f}% - {risk_label}
+   *Guidance: {rec_eng}*
 
 2. IMPRINT Core (Morphology only): {p_core:.1f}%
 3. MYLUNAR (External): {p_mylunar:.1f}%
@@ -252,7 +271,7 @@ if submit_btn:
     M = monocytes_abs / 1000.0
     P = platelets_abs 
 
-    # Calcolo SIMs (Solo i 3 necessari)
+    # Calcolo SIMs
     try:
         nlr = N / L
         mlr = M / L
@@ -305,14 +324,14 @@ if submit_btn:
                      (COEFF_MYLUNAR['shadows'] * shadow_val))
     prob_mylunar = sigmoid(logit_mylunar)
 
-    # Dati per Report
+    # Info Rischio (Colore/Label)
     color_ext, label_ext, rec_ext, bg_ext = get_risk_info(prob_ext)
     
-    # DIZIONARIO COMPLETO (Per evitare crash)
+    # DIZIONARIO RISULTATI (Completo per evitare crash)
     results_data = {
         'prob_ext': prob_ext,
-        'prob_core': prob_core,      # AGGIUNTO
-        'prob_mylunar': prob_mylunar, # AGGIUNTO
+        'prob_core': prob_core,     
+        'prob_mylunar': prob_mylunar,
         'risk_label': label_ext, 
         'rec': rec_ext,
         'nlr': nlr, 'mlr': mlr, 'piv': piv
@@ -347,7 +366,6 @@ if submit_btn:
             # SIMs Grid semplificata
             st.markdown("#### 🔬 Biomarker Profile (Drivers)")
             
-            # HTML per la griglia flessibile
             html_sims = f"""
             <div class="sim-container">
                 <div class="sim-box">
@@ -400,6 +418,7 @@ if submit_btn:
         st.subheader("📋 Generate Report")
         lang_choice = st.radio("Language", ["🇬🇧 English", "🇮🇹 Italiano"], horizontal=True, label_visibility="collapsed")
         
+        # Generazione report sicura
         report_text = generate_report_text(lang_choice, inputs_data, results_data)
         
         st.code(report_text, language='markdown')

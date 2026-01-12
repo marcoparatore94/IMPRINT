@@ -12,21 +12,23 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS per pulire l'interfaccia
+# CSS per pulire l'interfaccia e centrare i box
 st.markdown("""
 <style>
     .stNumberInput > label {font-weight: bold;}
     .stSelectbox > label {font-weight: bold;}
     .stSlider > label {font-weight: bold;}
     .block-container {padding-top: 2rem;}
+    div[data-testid="stMetricValue"] {
+        font-size: 2rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# DATI E COEFFICIENTI (AGGIORNATI DAI TUOI CSV)
+# DATI E COEFFICIENTI (AGGIORNATI)
 # ---------------------------------------------------------
 
-# 1. PARAMETRI DI STANDARDIZZAZIONE (Supplementary Table 1)
 Z_PARAMS = {
     'diameter': {'mean': 4.377, 'sd': 0.466, 'log': True},
     'cs':       {'mean': 2.500, 'sd': 0.894, 'log': False},
@@ -35,20 +37,18 @@ Z_PARAMS = {
     'piv':      {'mean': 5.537, 'sd': 0.975, 'log': True}
 }
 
-# 2. COEFFICIENTI IMPRINT EXTENDED (ESATTI DA CSV)
 COEFF_EXTENDED = {
     'intercept': -1.034533,
     'menopause': 1.731603,
     'irregular_margins': 2.044660,
-    'cystic_areas': 0.848012,   # Corretto da 0.613 a 0.848
-    'z_cs': 0.608570,           # Corretto
-    'z_diameter': 0.504175,     # Corretto
-    'z_nlr': -0.722877,         # Corretto da CSV
-    'z_mlr': -0.138242,         # Corretto da CSV
-    'z_piv': 1.225346           # Corretto
+    'cystic_areas': 0.848012,
+    'z_cs': 0.608570,
+    'z_diameter': 0.504175,
+    'z_nlr': -0.722877,
+    'z_mlr': -0.138242,
+    'z_piv': 1.225346
 }
 
-# 3. COEFFICIENTI IMPRINT CORE
 COEFF_CORE = {
     'intercept': -0.961059,
     'menopause': 1.238229,
@@ -58,7 +58,6 @@ COEFF_CORE = {
     'z_diameter': 0.529300
 }
 
-# 4. COEFFICIENTI MYLUNAR
 COEFF_MYLUNAR = {
     'intercept': -1.320251,
     'age': 0.023323,
@@ -83,6 +82,28 @@ def calculate_zscore(value, param_key):
 def sigmoid(logit):
     return 1 / (1 + math.exp(-logit))
 
+def get_risk_style(prob):
+    """Restituisce colore, label e bg_color in base alla probabilità"""
+    pct = prob * 100
+    if pct < 10:
+        return "#28a745", "LOW RISK", "rgba(40, 167, 69, 0.1)", "Conservative management / Follow-up"
+    elif pct < 50:
+        return "#ffc107", "INTERMEDIATE RISK", "rgba(255, 193, 7, 0.1)", "MRI / Referral to expert center"
+    else:
+        return "#dc3545", "HIGH RISK", "rgba(220, 53, 69, 0.1)", "Planned oncologic surgery"
+
+def display_risk_card(prob, model_name):
+    """Crea il box colorato standard"""
+    color, label, bg, guidance = get_risk_style(prob)
+    st.markdown(f"""
+    <div style="text-align: center; padding: 20px; background-color: {bg}; border-radius: 10px; border: 2px solid {color}; margin-bottom: 20px;">
+        <h4 style="color: {color}; margin:0; text-transform: uppercase; letter-spacing: 1px;">{model_name}</h4>
+        <h1 style="color: {color}; margin:10px 0; font-size: 3.5rem;">{prob*100:.1f}%</h1>
+        <h3 style="color: {color}; margin:0;">{label}</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown(f"**Guidance:** {guidance}")
+
 # ---------------------------------------------------------
 # INTERFACCIA PRINCIPALE
 # ---------------------------------------------------------
@@ -97,33 +118,26 @@ with col_input:
     st.subheader("1. Patient & Ultrasound Data")
     
     with st.form("risk_assessment_form"):
-        
-        # --- SEZIONE CLINICA ---
+        # CLINICA
         c1, c2 = st.columns(2)
-        with c1:
-            age = st.number_input("Age (years)", 18, 100, 50)
-        with c2:
-            menopause = st.radio("Menopause Status", ["Pre-menopausal", "Post-menopausal"], horizontal=True)
+        with c1: age = st.number_input("Age (years)", 18, 100, 50)
+        with c2: 
+            menopause = st.radio("Menopause", ["Pre-menopausal", "Post-menopausal"], horizontal=True)
             menopause_val = 1 if menopause == "Post-menopausal" else 0
 
         st.markdown("---")
-        
-        # --- SEZIONE ECOGRAFIA ---
+        # ECOGRAFIA
         st.markdown("##### 🖥️ Ultrasound Features")
         diameter = st.number_input("Max Lesion Diameter (mm)", 10, 300, 80)
-        color_score = st.slider("Color Score (1-4)", 1, 4, 2, help="1: No flow, 4: Abundant flow")
+        color_score = st.slider("Color Score (1-4)", 1, 4, 2)
         
         u1, u2, u3 = st.columns(3)
-        with u1:
-            irregular_margins = st.toggle("Irregular Margins")
-        with u2:
-            cystic_areas = st.toggle("Cystic Areas")
-        with u3:
-            shadows = st.toggle("Acoustic Shadows")
+        with u1: irregular_margins = st.toggle("Irregular Margins")
+        with u2: cystic_areas = st.toggle("Cystic Areas")
+        with u3: shadows = st.toggle("Acoustic Shadows")
 
         st.markdown("---")
-
-        # --- SEZIONE LABORATORIO ---
+        # LABORATORIO
         st.markdown("##### 🩸 Complete Blood Count")
         st.info("Enter absolute counts (e.g., 4000 for 4.0 x10⁹/L)")
         
@@ -142,40 +156,36 @@ with col_input:
 # CALCOLO
 # ---------------------------------------------------------
 if submit_btn:
-    # 1. CONVERSIONE UNITÀ (Fix Critico)
-    # Convertiamo da /µL (es. 4000) a x10^9/L (es. 4.0) per il calcolo PIV
+    # Conversione unità
     neutrophils = neutrophils_abs / 1000.0
     lymphocytes = lymphocytes_abs / 1000.0
     monocytes = monocytes_abs / 1000.0
-    platelets = platelets_abs # Le piastrine sono standard 200-400
+    platelets = platelets_abs
 
-    # 2. Calcolo Markers Derivati
+    # Markers Derivati
     try:
-        # NLR e MLR sono rapporti, quindi l'unità non conta (4000/2000 = 2)
         nlr = neutrophils_abs / lymphocytes_abs
         mlr = monocytes_abs / lymphocytes_abs
-        
-        # PIV dipende dall'unità! (4.0 * 200 * 0.4) / 2.0 = 160
         piv = (neutrophils * platelets * monocytes) / lymphocytes 
     except:
         nlr, mlr, piv = 0, 0, 0
 
-    # 3. Variabili Binarie
+    # Variabili Binarie
     irr_val = 1 if irregular_margins else 0
     cyst_val = 1 if cystic_areas else 0
     shadow_val = 1 if shadows else 0
     diam_gt80 = 1 if diameter > 80 else 0
     cs4_val = 1 if color_score == 4 else 0
 
-    # 4. Z-Scores
+    # Z-Scores
     z_diam = calculate_zscore(diameter, 'diameter')
     z_cs = calculate_zscore(color_score, 'cs')
     z_nlr = calculate_zscore(nlr, 'nlr')
     z_mlr = calculate_zscore(mlr, 'mlr')
     z_piv = calculate_zscore(piv, 'piv')
 
-    # 5. Calcolo Probabilità
-    # Extended
+    # Calcolo Probabilità
+    # EXTENDED
     logit_ext = (COEFF_EXTENDED['intercept'] + 
                  (COEFF_EXTENDED['menopause'] * menopause_val) +
                  (COEFF_EXTENDED['irregular_margins'] * irr_val) + 
@@ -187,7 +197,7 @@ if submit_btn:
                  (COEFF_EXTENDED['z_piv'] * z_piv))
     prob_ext = sigmoid(logit_ext)
 
-    # Core
+    # CORE
     logit_core = (COEFF_CORE['intercept'] + 
                   (COEFF_CORE['menopause'] * menopause_val) +
                   (COEFF_CORE['irregular_margins'] * irr_val) + 
@@ -196,7 +206,7 @@ if submit_btn:
                   (COEFF_CORE['z_diameter'] * z_diam))
     prob_core = sigmoid(logit_core)
 
-    # MyLunar
+    # MYLUNAR
     logit_mylunar = (COEFF_MYLUNAR['intercept'] + 
                      (COEFF_MYLUNAR['age'] * age) +
                      (COEFF_MYLUNAR['diameter_gt80'] * diam_gt80) + 
@@ -211,55 +221,28 @@ if submit_btn:
     with col_output:
         st.subheader("2. Risk Analysis Results")
         
-        tab1, tab2, tab3 = st.tabs(["IMPRINT Extended", "IMPRINT Core", "External (MYLUNAR)"])
+        tab1, tab2, tab3 = st.tabs(["🚀 IMPRINT Extended", "🔹 IMPRINT Core", "🌙 MYLUNAR"])
         
         # --- TAB EXTENDED ---
         with tab1:
             st.info("💡 **Recommended Model**: Uses Imaging + Biomarkers")
+            display_risk_card(prob_ext, "Extended Risk")
             
-            risk_pct = prob_ext * 100
-            if risk_pct < 10:
-                color = "#28a745" # Verde
-                risk_label = "LOW RISK"
-                rec = "Conservative management / Follow-up"
-                bg_color = "rgba(40, 167, 69, 0.1)"
-            elif risk_pct < 50:
-                color = "#ffc107" # Giallo/Arancio
-                risk_label = "INTERMEDIATE RISK"
-                rec = "MRI / Referral to expert center"
-                bg_color = "rgba(255, 193, 7, 0.1)"
-            else:
-                color = "#dc3545" # Rosso
-                risk_label = "HIGH RISK"
-                rec = "Planned oncologic surgery"
-                bg_color = "rgba(220, 53, 69, 0.1)"
-
-            st.markdown(f"""
-            <div style="text-align: center; padding: 20px; background-color: {bg_color}; border-radius: 10px; border: 2px solid {color};">
-                <h1 style="color: {color}; margin:0; font-size: 3rem;">{risk_pct:.1f}%</h1>
-                <h3 style="color: {color}; margin:0;">{risk_label}</h3>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.write("")
-            st.markdown(f"**Guidance:** {rec}")
-            
-            with st.expander("🔍 See Biomarker Details"):
+            with st.expander("🔍 Biomarker Details"):
                 st.write(f"**NLR:** {nlr:.2f}")
-                st.write(f"**PIV:** {piv:.0f} (Calculated with scaled units)")
-                st.caption("Inputs normalized to x10^9/L for calculation consistency.")
+                st.write(f"**PIV:** {piv:.0f}")
 
         # --- TAB CORE ---
         with tab2:
-            st.write("Morphology Only")
-            st.metric("Core Probability", f"{prob_core*100:.1f}%")
-            st.progress(prob_core)
+            st.info("Morphology Only (No Blood Tests)")
+            display_risk_card(prob_core, "Core Risk")
 
         # --- TAB MYLUNAR ---
         with tab3:
-            st.write("External Benchmark")
-            st.metric("MYLUNAR Probability", f"{prob_mylunar*100:.1f}%")
-            st.progress(prob_mylunar)
+            st.info("External Benchmark Model")
+            display_risk_card(prob_mylunar, "MYLUNAR Risk")
+            if shadows:
+                st.success("✅ Acoustic Shadows detected: Strong protective factor in MYLUNAR.")
 
 else:
     with col_output:

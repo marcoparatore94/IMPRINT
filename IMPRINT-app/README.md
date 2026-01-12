@@ -1,83 +1,113 @@
-```markdown
-# IMPRINT Clinical Decision Support 🩺
+# 🏥 IMPRINT Risk Calculator
 
-## Overview
-IMPRINT is a clinical decision support tool designed to estimate the risk of malignancy in uterine masses.  
-The **Extended model** has been updated with the final coefficients derived from logistic regression (statsmodels), ensuring calibrated outputs and performance metrics consistent with the published manuscript (AUC 0.865, Brier score 0.148, Hosmer–Lemeshow p=0.889, AIC 201.1).
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
+![Streamlit](https://img.shields.io/badge/Framework-Streamlit-red)
+![Status](https://img.shields.io/badge/Status-Validated-success)
 
-## Model
-- **Current version:** Extended (updated with final coefficients)
-- **Model file:** `models/imprint_extended.pkl`
-- **Predictors included:**
-  - **Ultrasound**
-    - Menopause (binary)
-    - Irregular margins (binary)
-    - Color score (ordinal, z-score)
-    - Maximum diameter (mm, z-score)
-    - Cystic areas (binary)
-  - **Systemic Inflammatory Markers (SIMs)**
-    - NLR (log + z-score)
-    - SII (log + z-score)
-    - PIV (log + z-score)
+## 📋 Overview
+**IMPRINT (Imaging and Markers for Preoperative Risk Assessment in Uterine Tumors)** is a clinical decision support tool designed to assist clinicians in the preoperative discrimination between benign leiomyomas and uterine sarcomas (including STUMP).
 
-## Input
-The interface requires the following inputs:
+This application implements the **IMPRINT Extended Model**, a multivariable logistic regression algorithm that integrates standardized ultrasound features with systemic inflammatory markers (SIMs) to refine risk stratification.
 
-- **Clinical**
-  - Age, AUB, Pain, Abdominal distress (captured but not included in final predictors)
-- **Ultrasound**
-  - Maximum diameter (mm)
-  - Irregular margins (checkbox)
-  - Cystic areas (checkbox)
-  - Color score (slider 1–4)
-  - Cooked aspect, Shadows absence (captured but not included in final predictors)
-- **Laboratory (absolute counts, x10^9/L)**
-  - Platelets
-  - Neutrophils
-  - Lymphocytes
-  - Monocytes
-  - Eosinophils
-
-From these values, the app automatically derives systemic inflammatory markers (NLR, PLR, MLR, ELR, SII, SIRI, LMR, PIV) and applies manuscript‑consistent transformations (conditional log‑transform + z‑score standardization).
-
-## Output
-The Extended model provides:
-- **Calibrated probability of malignancy** (continuous value between 0 and 1)
-- **Risk class (band)** based on decision thresholds:
-  - Low risk (<10%)
-  - Intermediate risk (10–30%)
-  - High risk (≥30%)
-- **Clinical guidance** linked to each risk band:
-  - Low: consider conservative management
-  - Intermediate: consider MRI or referral
-  - High: refer to sarcoma center
-
-## Developer Mode
-When developer mode is enabled, the app displays:
-- Predictors actually used by the model
-- The transformed input row (model-ready features)
-- Derived SIMs
-- Variables captured but not included in predictors
-- Raw probability and classification outputs
-
-## Performance
-- Apparent AUC: 0.865  
-- Bootstrap AUC (95% CI): 0.816–0.910  
-- Brier score: 0.148  
-- Hosmer–Lemeshow p-value: 0.889  
-- AIC: 201.1  
+> **Key Feature:** Unlike traditional algorithms, IMPRINT uses continuous variables (standardized via Z-scores) rather than dichotomous cut-offs, preserving the biological continuum of risk.
 
 ---
 
-## Quick Start
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Launch the app:
-   ```bash
-   streamlit run app.py
-   ```
-3. Enter clinical, ultrasound, and lab data in the interface.
-4. Click **Estimate risk** to obtain the calibrated probability and risk class.
-```
+## 🧠 Models Implemented
+
+The application computes risks using three distinct algorithms simultaneously for comparison:
+
+| Model | Type | Predictors | Best Use Case |
+| :--- | :--- | :--- | :--- |
+| **🚀 IMPRINT Extended** | **Combined** (US + Blood) | Menopause, Irreg. Margins, CS, Diameter, Cystic Areas, **PIV**, **NLR**, **MLR** | **Recommended.** Best calibration and discrimination (AUC 0.864). |
+| **🔹 IMPRINT Core** | Ultrasound Only | Menopause, Irreg. Margins, CS, Diameter, Cystic Areas | Use when laboratory blood tests are unavailable. |
+| **🌙 MYLUNAR** | External Benchmark | Age, Diameter >8cm, Irreg. Margins, CS=4, Shadows | Included for external validation and comparison purposes. |
+
+---
+
+## ⚙️ Methodology & Architecture
+
+The model coefficients are **hard-coded** within `app.py`, derived from the final analysis of the training cohort (N=204). This ensures the app is standalone and does not rely on external dependency files.
+
+### Data Standardization
+To maintain consistency with the published manuscript, the app applies a rigorous preprocessing pipeline to raw inputs:
+
+1.  **Log-Transformation:** Applied to skewed variables (Max Diameter, NLR, MLR, PIV) to normalize distribution.
+2.  **Z-Score Standardization:** $z = \frac{x - \mu}{\sigma}$  
+    *Inputs are standardized using the population parameters (Mean/SD) defined in the study's **Supplementary Table 1**.*
+
+### Performance Metrics (Extended Model)
+* **AUC:** 0.864 (95% CI: 0.813–0.908)
+* **Brier Score:** 0.150 (High calibration accuracy)
+* **Calibration:** Hosmer–Lemeshow p=0.872
+* **AIC:** 202.5
+
+---
+
+## 📝 Input Requirements
+
+To generate a prediction, the interface requires the following data points:
+
+### 1. Clinical Data
+* **Age** (Years)
+* **Menopausal Status** (Pre/Post)
+
+### 2. Ultrasound Features
+* **Max Lesion Diameter** (mm, continuous)
+* **Color Score** (Subjective semiquantitative score 1–4)
+* **Irregular Margins** (Yes/No)
+* **Cystic Areas** (Yes/No)
+* **Acoustic Shadows** (Required only for MYLUNAR comparison)
+
+### 3. Laboratory Data (Complete Blood Count)
+*Enter absolute counts (e.g., 4500/µL or 4.5 x10³/µL):*
+* **Neutrophils**
+* **Lymphocytes**
+* **Monocytes**
+* **Platelets**
+
+*The app automatically calculates derived markers (NLR, MLR, PIV).*
+
+---
+
+## 🚦 Risk Classification
+
+Patients are stratified into three clinical management bands:
+
+| Risk Band | Probability | Clinical Suggestion |
+| :--- | :--- | :--- |
+| **🟢 Low Risk** | **< 10%** | Consider conservative management or ultrasound follow-up. |
+| **🟡 Intermediate**| **10 – 50%** | Consider second-level imaging (MRI) or referral to expert centers. |
+| **🔴 High Risk** | **> 50%** | Planned oncologic surgery in a referral sarcoma center is advised. |
+
+---
+
+## 💻 Installation & Usage
+
+This app is built with **Streamlit**. To run it locally:
+
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/your-username/IMPRINT-app.git](https://github.com/your-username/IMPRINT-app.git)
+    cd IMPRINT-app
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Launch the app:**
+    ```bash
+    streamlit run app.py
+    ```
+
+---
+
+## ⚖️ Disclaimer
+
+**For Research and Educational Purposes Only.**
+
+This tool is a statistical model derived from retrospective data. It is **not** intended to replace clinical judgment, pathological diagnosis, or official guidelines. The authors assume no responsibility for medical decisions made based on this tool.
+
+_Derived from the IMPRINT Study (Paratore et al., 2025)._

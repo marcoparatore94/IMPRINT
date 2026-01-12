@@ -126,7 +126,10 @@ def get_sim_style(value, name):
 
 def generate_report_text(lang, inputs, results):
     """Genera il testo per il copia-incolla."""
-    risk_pct = results['prob_ext'] * 100
+    # Estrai percentuali
+    p_ext = results['prob_ext'] * 100
+    p_core = results['prob_core'] * 100
+    p_mylunar = results['prob_mylunar'] * 100
     
     if lang == "🇮🇹 Italiano":
         text = f"""**REFERTO IMPRINT RISK ASSESSMENT**
@@ -140,10 +143,12 @@ Caratteristiche: Margini {"Irregolari" if inputs['irr'] else "Regolari"}, {"Aree
 - NLR: {results['nlr']:.2f}
 - MLR: {results['mlr']:.2f}
 
-**RISULTATO (IMPRINT Extended):**
-Probabilità Malignità: {risk_pct:.1f}%
-Classe di Rischio: {results['risk_label']}
-Raccomandazione: {results['rec']}
+**RISULTATI MODELLI:**
+1. IMPRINT Extended (Ref): {p_ext:.1f}% - {results['risk_label']}
+   *Guidance: {results['rec']}*
+
+2. IMPRINT Core (Morphology only): {p_core:.1f}%
+3. MYLUNAR (External): {p_mylunar:.1f}%
 ------------------------------------------------
 *Calcolato tramite IMPRINT App - Solo a scopo di ricerca.*"""
     
@@ -159,10 +164,12 @@ Features: {"Irregular" if inputs['irr'] else "Regular"} margins, {"Cystic areas"
 - NLR: {results['nlr']:.2f}
 - MLR: {results['mlr']:.2f}
 
-**RESULT (IMPRINT Extended):**
-Malignancy Probability: {risk_pct:.1f}%
-Risk Class: {results['risk_label']}
-Guidance: {results['rec']}
+**MODEL RESULTS:**
+1. IMPRINT Extended (Ref): {p_ext:.1f}% - {results['risk_label']}
+   *Guidance: {results['rec']}*
+
+2. IMPRINT Core (Morphology only): {p_core:.1f}%
+3. MYLUNAR (External): {p_mylunar:.1f}%
 ------------------------------------------------
 *Calculated via IMPRINT App - For research use only.*"""
     
@@ -239,7 +246,7 @@ with col_input:
 # ---------------------------------------------------------
 if submit_btn:
     # Preparazione variabili
-    # Conversione unità per formule SIMs (tutto in x10^9/L, tranne Piastrine che sono x10^3 nelle formule standard)
+    # Conversione unità per formule SIMs
     N = neutrophils_abs / 1000.0
     L = lymphocytes_abs / 1000.0
     M = monocytes_abs / 1000.0
@@ -300,8 +307,14 @@ if submit_btn:
 
     # Dati per Report
     color_ext, label_ext, rec_ext, bg_ext = get_risk_info(prob_ext)
+    
+    # DIZIONARIO COMPLETO (Per evitare crash)
     results_data = {
-        'prob_ext': prob_ext, 'risk_label': label_ext, 'rec': rec_ext,
+        'prob_ext': prob_ext,
+        'prob_core': prob_core,      # AGGIUNTO
+        'prob_mylunar': prob_mylunar, # AGGIUNTO
+        'risk_label': label_ext, 
+        'rec': rec_ext,
         'nlr': nlr, 'mlr': mlr, 'piv': piv
     }
     inputs_data = {
@@ -413,6 +426,6 @@ st.markdown("""
     <br>
     <b>Privacy Notice:</b> No patient data is stored on external servers. All calculations are performed in your browser session.
     <br>
-    <i>Derived from the IMPRINT Study (Paratore et al., 2025).</i>
+    <i>Derived from the IMPRINT Study (Bruno et al., 2025).</i>
 </div>
 """, unsafe_allow_html=True)

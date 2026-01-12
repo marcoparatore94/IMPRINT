@@ -123,8 +123,8 @@ def get_sim_style(value, name):
     color = "#dc3545" if value >= cutoff else "#212529"
     return f"color: {color};"
 
-def generate_report_text(lang_selection, inputs, results):
-    """Genera il testo per il copia-incolla. Usa .get() per evitare crash."""
+def generate_report_text(inputs, results):
+    """Genera il testo per il copia-incolla SOLO IN INGLESE."""
     
     # Estrazione sicura valori
     p_ext = results.get('prob_ext', 0) * 100
@@ -132,66 +132,49 @@ def generate_report_text(lang_selection, inputs, results):
     p_mylunar = results.get('prob_mylunar', 0) * 100
     
     risk_label = results.get('risk_label', 'N/A')
+    rec_eng = results.get('rec', '')
     
     # Recupero valori SIMs sicuri
     v_piv = results.get('piv', 0)
     v_nlr = results.get('nlr', 0)
     v_mlr = results.get('mlr', 0)
-
-    # Determina se Italiano (Controlla se la stringa contiene 'Italiano')
-    is_ita = "Italiano" in lang_selection
     
-    if is_ita:
-        # Traduzione dinamica della raccomandazione
-        if p_ext < 10:
-            rec_ita = "Gestione conservativa / Follow-up ecografico"
-        elif p_ext < 50:
-            rec_ita = "Risonanza Magnetica (RM) / Riferimento a centro esperto"
-        else:
-            rec_ita = "Chirurgia oncologica pianificata presso centro di riferimento"
+    # Formattazione per Word (Lines chiare, niente markdown complesso)
+    text = f"""IMPRINT RISK ASSESSMENT REPORT
+================================================
+PATIENT DATA
+- Age: {int(inputs.get('age',0))} years
+- Menopause: {inputs.get('menopause','')}
 
-        text = f"""**REFERTO IMPRINT RISK ASSESSMENT**
-------------------------------------------------
-**Paziente:** {int(inputs.get('age',0))} anni, {inputs.get('menopause','')}
-**Ecografia:** Massa di {inputs.get('diameter',0)} mm, CS {inputs.get('cs',0)}
-Caratteristiche: Margini {"Irregolari" if inputs.get('irr') else "Regolari"}, {"Aree Cistiche" if inputs.get('cyst') else "Solida"}, {"Ombre Acustiche" if inputs.get('shadows') else "Nessuna Ombra"}.
+ULTRASOUND FEATURES
+- Max Diameter: {inputs.get('diameter',0)} mm
+- Color Score: {inputs.get('cs',0)}
+- Margins: {"Irregular" if inputs.get('irr') else "Regular"}
+- Cystic Areas: {"Present" if inputs.get('cyst') else "Absent"}
+- Acoustic Shadows: {"Present" if inputs.get('shadows') else "Absent"}
 
-**Profilo Infiammatorio (Drivers):**
+INFLAMMATORY BIOMARKERS (DRIVERS)
 - PIV: {v_piv:.0f}
 - NLR: {v_nlr:.2f}
 - MLR: {v_mlr:.2f}
 
-**RISULTATI MODELLI:**
-1. IMPRINT Extended (Ref): {p_ext:.1f}% - {risk_label}
-   *Raccomandazione: {rec_ita}*
-
-2. IMPRINT Core (Morphology only): {p_core:.1f}%
-3. MYLUNAR (External): {p_mylunar:.1f}%
 ------------------------------------------------
-*Calcolato tramite IMPRINT App - Solo a scopo di ricerca.*"""
-    
-    else: # English
-        rec_eng = results.get('rec', '')
-        text = f"""**IMPRINT RISK ASSESSMENT REPORT**
+MODEL RESULTS
 ------------------------------------------------
-**Patient:** {int(inputs.get('age',0))} y.o., {inputs.get('menopause','')}
-**Ultrasound:** Mass {inputs.get('diameter',0)} mm, CS {inputs.get('cs',0)}
-Features: {"Irregular" if inputs.get('irr') else "Regular"} margins, {"Cystic areas" if inputs.get('cyst') else "Solid"}, {"Acoustic Shadows" if inputs.get('shadows') else "No Shadows"}.
+1. IMPRINT Extended (Reference Model)
+   >> Probability: {p_ext:.1f}%
+   >> Risk Class:  {risk_label}
+   >> Guidance:    {rec_eng}
 
-**Inflammatory Profile (Drivers):**
-- PIV: {v_piv:.0f}
-- NLR: {v_nlr:.2f}
-- MLR: {v_mlr:.2f}
+2. IMPRINT Core (Morphology only)
+   >> Probability: {p_core:.1f}%
 
-**MODEL RESULTS:**
-1. IMPRINT Extended (Ref): {p_ext:.1f}% - {risk_label}
-   *Guidance: {rec_eng}*
+3. MYLUNAR (External Benchmark)
+   >> Probability: {p_mylunar:.1f}%
 
-2. IMPRINT Core (Morphology only): {p_core:.1f}%
-3. MYLUNAR (External): {p_mylunar:.1f}%
-------------------------------------------------
-*Calculated via IMPRINT App - For research use only.*"""
-    
+================================================
+Calculated via IMPRINT App - Research Use Only
+"""
     return text
 
 # ---------------------------------------------------------
@@ -327,7 +310,7 @@ if submit_btn:
     # Info Rischio (Colore/Label)
     color_ext, label_ext, rec_ext, bg_ext = get_risk_info(prob_ext)
     
-    # DIZIONARIO RISULTATI (Completo per evitare crash)
+    # DIZIONARIO RISULTATI
     results_data = {
         'prob_ext': prob_ext,
         'prob_core': prob_core,     
@@ -416,13 +399,12 @@ if submit_btn:
         # --- SEZIONE REPORT GENERATORE ---
         st.markdown("---")
         st.subheader("📋 Generate Report")
-        lang_choice = st.radio("Language", ["🇬🇧 English", "🇮🇹 Italiano"], horizontal=True, label_visibility="collapsed")
         
-        # Generazione report sicura
-        report_text = generate_report_text(lang_choice, inputs_data, results_data)
+        # Generazione report solo inglese e sicura
+        report_text = generate_report_text(inputs_data, results_data)
         
-        st.code(report_text, language='markdown')
-        st.caption("Click the 'Copy' button in the top-right of the box above.")
+        st.code(report_text, language='text')
+        st.caption("Click the 'Copy' button in the top-right of the box above to paste into Word.")
 
 else:
     with col_output:
